@@ -1,1 +1,1 @@
-We applied machine learning methods. Now we know future US inflation.
+We applied machine learning methods. We know future US inflation.
