@@ -77,3 +77,10 @@ data_cleaned <- data_cleaned[, setdiff(names(data_cleaned),
 # now the data has 780 obs and 122 variables
 
 # TO DO: deal with variables CP3Mx and COMPAPFFx which only have 2 and 1 missing values respectively in 2020
+
+
+git config --global --edit
+
+After doing this, you may fix the identity used for this commit with:
+  
+  git commit --amend --reset-author
