@@ -10,11 +10,7 @@ library(readr)
 # ============================================
 # 1. LOAD DATA
 # ============================================
-<<<<<<< HEAD
 file <- "C:/Users/sianeselli/OneDrive - Charles River Associates International/A. BSE/Data science-LONSIANESELLI2/Group Project/BSE_DataProject/02_Input/2025-09-MD.csv"
-=======
-data <- read.csv("02_Input\2025-09-MD.csv")
->>>>>>> 1277150e9dbde694a57344ae1a35aba9fb8f8e89
 
 # define the fredmd function 
 fredmd <- function(file = "", date_start = NULL, date_end = NULL, transform = TRUE) {
@@ -166,7 +162,6 @@ fredmd <- function(file = "", date_start = NULL, date_end = NULL, transform = TR
 
 # Get transformed data
 data_transformed <- fredmd(
-<<<<<<< HEAD
   file,
   transform = TRUE
 )
@@ -178,10 +173,3 @@ folder_path <- "C:/Users/sianeselli/OneDrive - Charles River Associates Internat
 saveRDS(data_transformed, file = file.path(folder_path, "data_transformed.rds"))
 
 
-=======
-  file = "02_Input\2025-09-MD.csv",
-  transform = TRUE
-)
-
-write.csv("03_Output\01_Data_Transformed.csv")
->>>>>>> 1277150e9dbde694a57344ae1a35aba9fb8f8e89
