@@ -5,7 +5,7 @@ library(readr)
 # ============================================
 # 1. LOAD DATA
 # ============================================
-data <- read.csv("C:/Users/emili/Downloads/2025-09-MD.csv")
+data <- read.csv("02_Input\2025-09-MD.csv")
 
 fredmd <- function(file = "", date_start = NULL, date_end = NULL, transform = TRUE) {
   # Error checking
@@ -152,7 +152,7 @@ fredmd <- function(file = "", date_start = NULL, date_end = NULL, transform = TR
 
 # Get transformed data
 data_transformed <- fredmd(
-  file = "C:/Users/emili/Downloads/2025-09-MD.csv",
+  file = "02_Input\2025-09-MD.csv",
   transform = TRUE
 )
 
