@@ -1,3 +1,8 @@
+# Author: Silvia Ianeselli
+# Date: 24/11/2025
+# Scope: This script applies the original data transformation code to our dataset
+  # The output data_transformed considers data beyond our period of interest and NAs are not yet dealth with
+
 
 library(dplyr)
 library(readr)  
@@ -5,13 +10,14 @@ library(readr)
 # ============================================
 # 1. LOAD DATA
 # ============================================
-data <- read.csv("C:/Users/emili/Downloads/2025-09-MD.csv")
+file <- "C:/Users/sianeselli/OneDrive - Charles River Associates International/A. BSE/Data science-LONSIANESELLI2/Group Project/BSE_DataProject/02_Input/2025-09-MD.csv"
 
+# define the fredmd function 
 fredmd <- function(file = "", date_start = NULL, date_end = NULL, transform = TRUE) {
   # Error checking
-  if (!is.logical(transform))
+  if (!is.logical(transform)) # check that transform is TRUE/FALSE
     stop("'transform' must be logical.")
-  if ((class(date_start) != "Date") && (!is.null(date_start)))
+  if ((class(date_start) != "Date") && (!is.null(date_start))) # check date start and end are either Date or null
     stop("'date_start' must be Date or NULL.")
   if ((class(date_end) != "Date") && (!is.null(date_end)))
     stop("'date_end' must be Date or NULL.")
@@ -31,9 +37,11 @@ fredmd <- function(file = "", date_start = NULL, date_end = NULL, transform = TR
   
   # Prepare raw data
   rawdata <- readr::read_csv(file, col_names = FALSE, col_types = cols(X1 = col_date(format = "%m/%d/%Y")),
-                             skip = 2)
+                             skip = 2) # load csv skipping first 2 rows and trating first column as date
   
   rawdata <- as.data.frame(rawdata)
+  
+  # remove last 20 rows if they are empty/NA (???)
   row_to_remove = c()
   for (row in (nrow(rawdata)-20):nrow(rawdata)){
     if(!any(is.finite(unlist(rawdata[row, ])))){
@@ -44,6 +52,7 @@ fredmd <- function(file = "", date_start = NULL, date_end = NULL, transform = TR
     rawdata = rawdata[-row_to_remove,]
   }
   
+  # extract headers
   attrdata <- utils::read.csv(file, header = FALSE, nrows = 2)
   header <- c("date", unlist(attrdata[1,2:ncol(attrdata)]))
   colnames(rawdata) <- header
@@ -109,7 +118,7 @@ fredmd <- function(file = "", date_start = NULL, date_end = NULL, transform = TR
   }
   
   
-  # Transform data
+  # Transform data (loop through all columns except date and apply the appropriate transformation code)
   if (transform) {
     # Apply transformations
     N <- ncol(rawdata)
@@ -127,6 +136,7 @@ fredmd <- function(file = "", date_start = NULL, date_end = NULL, transform = TR
     data <- rawdata
   }
   
+  # Import all data from 1959 until the last month present in the data
   
   # Null case of date_start and date_end
   if (is.null(date_start))
@@ -152,7 +162,14 @@ fredmd <- function(file = "", date_start = NULL, date_end = NULL, transform = TR
 
 # Get transformed data
 data_transformed <- fredmd(
-  file = "C:/Users/emili/Downloads/2025-09-MD.csv",
+  file,
   transform = TRUE
 )
+
+View(data_transformed)
+
+# save dataset
+folder_path <- "C:/Users/sianeselli/OneDrive - Charles River Associates International/A. BSE/Data science-LONSIANESELLI2/Group Project/BSE_DataProject/03_Output"
+saveRDS(data_transformed, file = file.path(folder_path, "data_transformed.rds"))
+
 
