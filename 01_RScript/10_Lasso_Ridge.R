@@ -16,10 +16,8 @@ Xdt  <- Xdt[, sapply(Xdt, function(x) sum(is.na(x))==0), with = F]  # Drop cols 
 X    <- as.matrix(Xdt)
 
 ### Rolling glmnet with forward TS-CV for lambda
-rolling_glmnet_ts <- function(y_all, X_all, window_size, train_size, alpha) {
+get_best_lambda <- function(y, X, window_size, alpha) {
   #browser()
-  y      <- y_all[1:train_size]
-  X      <- X_all[1:train_size, ]
   n      <- length(y)
   n_out  <- n - window_size
   window <- window_size
@@ -38,7 +36,6 @@ rolling_glmnet_ts <- function(y_all, X_all, window_size, train_size, alpha) {
     X_forecast <- X[window + k     , , drop = F]
     
     # TS-CV: expanding 1-step-ahead within the window
-    
     mse <- NA
     for (j in seq_along(lambda_grid)) {
       lam <- lambda_grid[j]
@@ -51,16 +48,24 @@ rolling_glmnet_ts <- function(y_all, X_all, window_size, train_size, alpha) {
   mse <- err_sum / err_count
   # best lambda
   best_lam <- lambda_grid[which.min(mse)]
-  
-  # final fit on full window
+  return(best_lam)
+}
+
+rolling_glmnet_ts <- function(y_all, X_all, window_size, train_size, alpha) {
+  # y_all vector. X_all matrix.
+  if(length(y_all) != nrow(X_all)) stop("Y and X lengths does not match")
+  train_index <- 1:train_size
+  fcast_index <- (train_size+1):length(y_all)
+  y      <- y_all[train_index]
+  X      <- X_all[train_index, ]
+  best_lam <- get_best_lambda(y, X, window_size, alpha)
   fit_full <- glmnet(X, y, alpha=alpha, lambda=best_lam, standardize=T)
-  preds <- as.numeric(predict(fit_full, tail(X, n_out)))
+  preds <- as.numeric(predict(fit_full, X_all[fcast_index, , drop=F]))
   preds
 }
 
-
 ### Run models
-w <- 60  # 5 years of monthly data
+w <- 120  # 10 years of monthly data
 t_s <- 240
 pred_lasso <- rolling_glmnet_ts(Y, X, window = w, train_size=t_s, alpha = 1)     # Lasso
 pred_ridge <- rolling_glmnet_ts(Y, X, window = w, alpha = 0)     # Ridge
