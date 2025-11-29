@@ -35,10 +35,10 @@ rolling_window_fcast <- function(y, X, window_size, step=1, alpha_lasso, lambda_
     # TS-CV: expanding 1-step-ahead within the window
     fit <- glmnet(X_window, y_window, alpha=alpha_lasso, lambda=lambda_lasso, standardize=T)
     yhat <- as.numeric(predict(fit, X_forecast))
-    err_sum <- err_sum + (y[window + k] - yhat)^2
+    err_sum <- err_sum + (y[window + k + step-1] - yhat)^2
     err_count  <- err_count + 1
   }
-  
+  forecast <- 1
   mse <- err_sum / err_count
   rolling_res <- list("mse" = mse, "forecast" = forecast)
   rolling_res
@@ -50,15 +50,17 @@ get_best_lambda <- function(y, X, window_size, step, alpha_lasso) {
   fit0 <- glmnet(X[1:window_size, , drop = F], y[1:window_size], 
                  alpha = alpha_lasso, standardize = T)
   lambda_grid <- fit0$lambda
-  for (j in seq_along(lambda_grid)) {
-    try_lambda_lasso <- j
-    rolling_res <- rolling_window_fcast(y, X, window_size, step=1, alpha_lasso, 
-                                        try_lambda_lasso, anchored=F)
+  rolling_res <- list(NA)
+  rolling_mse <- NA
+  for (i in 1:length(lambda_grid)) {
+    #browser()
+    rolling_res[[i]] <- rolling_window_fcast(y, X, window_size, step=1, alpha_lasso, 
+                                           lambda_grid[i], anchored=F)
+    rolling_mse[i] <- rolling_res[[i]]$mse
   }
-
+  #browser()
   # best lambda
-  mse      <- rolling_res$mse
-  best_lam <- lambda_grid[which.min(mse)]
+  best_lam <- lambda_grid[which.min(rolling_mse)]
   return(best_lam)
 }
 
@@ -70,7 +72,6 @@ rolling_glmnet_ts <- function(y_all, X_all, window_size, train_size, step=1, alp
   y      <- y_all[train_index]
   X      <- X_all[train_index, ,drop=F]
   best_lam <- get_best_lambda(y, X, window_size, step, alpha_lasso)
-  #browser()
   fit_full <- glmnet(X, y, alpha=alpha_lasso, lambda=best_lam, standardize=T)
   preds <- as.numeric(predict(fit_full, X_all[fcast_index, , drop=F]))
   preds
