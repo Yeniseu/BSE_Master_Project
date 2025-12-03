@@ -1,7 +1,7 @@
-source("modelfunctions/func-rf.R")
+source("00_Other/2021_Medeiros_Code/first-sample/functions/func-rf.R")
 library(HDeconometricsBeta)
 library(randomForest)
-load("dados/rawdata2000.rda")
+load("00_Other/2021_Medeiros_Code/first-sample/rawdata2000.rda")
 Y=dados
 
 nprev=132

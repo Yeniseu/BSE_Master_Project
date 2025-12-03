@@ -1,6 +1,7 @@
-source("modelfunctions/functionsD/func-rlasso.R")
+rm(list=ls())
+source("00_Other/2021_Medeiros_Code/second-sample/functions/func-rlasso.R")
 library(hdm)
-load("dados/rawdata.RData")
+load("00_Other/2021_Medeiros_Code/second-sample/rawdata.RData")
 Y=dados
 dum=rep(0,nrow(Y))
 dum[which.min(Y[,1])]=1

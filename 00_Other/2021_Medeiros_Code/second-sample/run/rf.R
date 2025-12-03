@@ -1,7 +1,7 @@
-source("modelfunctions/functionsD/func-rf.R")
+source("00_Other/2021_Medeiros_Code/second-sample/functions/func-rf.R")
 #library(HDeconometrics)
 library(randomForest)
-load("dados/rawdata.RData")
+load("00_Other/2021_Medeiros_Code/second-sample/rawdata.RData")
 Y=dados
 dum=rep(0,nrow(Y))
 dum[which.min(Y[,1])]=1
