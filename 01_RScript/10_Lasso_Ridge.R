@@ -17,9 +17,9 @@ Xdt  <- Xdt[, sapply(Xdt, function(x) sum(is.na(x))==0), with = F]  # Drop cols 
 X    <- as.matrix(Xdt)
 
 ### Rolling glmnet with forward TS-CV for lambda
-rolling_window_fcast <- function(y, X, window_size, step=1, alpha_lasso, lambda_lasso, anchored=F) {
+roll_wind_fcast <- function(y, X, window_size, step=1, alpha_lasso, lambda_lasso, anchored=F, skip=0) {
   # Create each rolling window, then forecast
-  roll_index <- createTimeSlices(y, window_size, step, fixedWindow = T)
+  roll_index <- createTimeSlices(y, window_size, step, fixedWindow = T, skip = skip)
   data_all <- cbind(y, X)
   train <- lapply(roll_index$train, function(x) data_all[x, ,drop=F])
   test  <- lapply(roll_index$test , function(x) data_all[x, ,drop=F])
@@ -51,47 +51,61 @@ get_best_lambda <- function(y, X, window_size, step, alpha_lasso) {
   #browser()
   # Create lambda grid automatically
   fit0 <- glmnet(X[1:window_size, , drop = F], y[1:window_size], 
-                 alpha = alpha_lasso, standardize = T)
+                 alpha = alpha_lasso, standardize = T, nlambda = 20)
   lambda_grid <- fit0$lambda
+  if(alpha_lasso == 1) {  # Remove lambda possibilities that does not change variable count
+    lambda_grid <- lambda_grid[fit0$df != shift(fit0$df, fill=-1)]  
+  }
   rolling_res <- list(NA)
   rolling_rmse <- NA
   for (i in 1:length(lambda_grid)) {
     #browser()
-    rolling_res[[i]] <- rolling_window_fcast(y, X, window_size, step=step, alpha_lasso, 
-                                             lambda_grid[i], anchored=F)
+    rolling_res[[i]] <- roll_wind_fcast(y, X, window_size, step=step, alpha_lasso, 
+                                        lambda_grid[i], anchored=F)
     rolling_rmse[i] <- rolling_res[[i]]$rmse[step]
   }
-  #browser()
+
   # best lambda
-  best_lam <- lambda_grid[which.min(rolling_rmse)]
-  return(best_lam)
+  best_lam_index <- which.min(rolling_rmse)
+  best_lam_and_mse <- c(lambda_grid[best_lam_index], rolling_rmse[best_lam_index])
+  return(best_lam_and_mse)
 }
 
 rolling_glmnet_ts <- function(y_all, X_all, window_size, train_size, step=1, alpha_lasso) {
   # y_all vector. X_all matrix.
   if(length(y_all) != nrow(X_all)) stop("Y and X lengths does not match")
-  train_index <- 1:train_size
-  fcast_index <- (train_size+1):length(y_all)
-  y      <- y_all[train_index]
-  X      <- X_all[train_index, ,drop=F]
-  best_lam <- get_best_lambda(y, X, window_size, step=step, alpha_lasso)
-  fit_full <- glmnet(X, y, alpha=alpha_lasso, lambda=best_lam, standardize=T)
-  preds <- as.numeric(predict(fit_full, X_all[fcast_index, , drop=F]))
-  preds
+  y_train <- y_all[1:train_size]
+  X_train <- X_all[1:train_size, ,drop=F]
+  best_lam_and_rmse <- matrix(NA, length(alpha_lasso), 3) # Store alpha, best lambda and its rmse
+  for(i in 1:length(alpha_lasso)) {
+    lam_and_rmse <- get_best_lambda(y_train, X_train, window_size, step=step, alpha_lasso[i])
+    best_lam_and_rmse[i, ] <- c(alpha_lasso[i], lam_and_rmse)
+  }
+  best_comb_index <- which.min(best_lam_and_rmse[, 3])
+  best_alpha <- best_lam_and_rmse[best_comb_index, 1]
+  best_lam   <- best_lam_and_rmse[best_comb_index, 2]
+
+  #fit_full <- glmnet(X, y, alpha=alpha_lasso, lambda=best_lam, standardize=T)
+  skip_for_2001_2015 <- train_size-window_size
+  skip_for_2016_2025 <- skip_for_2001_2015 + (2016-2001)*12
+  
+  #browser()
+  roll_fcast_1 <- roll_wind_fcast(y_all, X_all, window_size, step=step, best_alpha,
+                                 best_lam, anchored=F, skip = skip_for_2001_2015)
+  roll_fcast_2 <- roll_wind_fcast(y_all, X_all, window_size, step=step, best_alpha,
+                                 best_lam, anchored=F, skip = skip_for_2016_2025)
+  all_res <- list(roll_fcast_1, roll_fcast_2)
+  all_res
 }
 
 ### Run models
-w <- 120  # 10 years of monthly data
-t_s <- 240
-pred_lasso <- rolling_glmnet_ts(Y, X, window = w, train_size=t_s, step=2, alpha = 1)     # Lasso
-pred_ridge <- rolling_glmnet_ts(Y, X, window = w, alpha = 0)     # Ridge
-pred_elnet <- rolling_glmnet_ts(Y, X, window = w, alpha = 0.5)   # Elastic Net
+w <- 360  # 30 years of monthly data
+t_s <- fred[, which(date=="2000-12-01")]
+pred_lasso <- rolling_glmnet_ts(Y, X, window = w, train_size=t_s, step=1, alpha = 1)     # Lasso
+pred_ridge <- rolling_glmnet_ts(Y, X, window = w, train_size=t_s, step=1, alpha = 0)     # Ridge
+pred_elnet <- rolling_glmnet_ts(Y, X, window = w, train_size=t_s, step=1, alpha = seq(0, 1, by = 0.1))   # Elastic Net
 
-# Align forecasts with actual Y (they start at t = w+1)
-y_actual <- Y[(w + 1):length(Y)]
-tail(cbind(
-  y_actual   = y_actual,
-  lasso_hat  = pred_lasso,
-  ridge_hat  = pred_ridge,
-  enet_hat   = pred_enet
-))
+
+
+
+
