@@ -51,17 +51,15 @@ runlasso <- function(Y, indice, lag, alpha=1, type="lasso", lambda, learn_lambda
 }
 
 
-
-
 get_best_lambda <- function(Y,nprev,indice=1,lag=1,alpha=1, type="lasso", nlambda=25) {
   # Create lambda grid automatically
   lambda_grid <- runlasso(Y[1:(nrow(Y)-nprev),],indice,lag,alpha,type,0,learn_lambda_grid=T, nlambda=nlambda)
-  
+  # Check the grid one by one
   save_res <- list(NA)
   for (i in 1:length(lambda_grid)) {
     save_res[[i]] <- lasso_roll_win(Y,nprev,indice,lag,alpha,type,lambda_grid[i])
   }
-  
+  # Select best lambda with lowest rmse
   rmse <- sapply(save_res, function(x) x$errors[1])
   best_lam <- lambda_grid[which.min(rmse)]
   best_lam_all <- list(best_lam = best_lam, all_res = save_res)
