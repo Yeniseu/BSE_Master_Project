@@ -77,7 +77,7 @@ runrf=function(Y,indice,lag, nfeature){
   
   dum=tail(dum,length(y))
   
-  model=randomForest(cbind(X,dum),y,importance = TRUE, nfeature)
+  model=randomForest(cbind(X,dum),y,importance = TRUE, mtry = nfeature)
   pred=predict(model,c(X.out,0))
   
   return(list("model"=model,"pred"=pred))
