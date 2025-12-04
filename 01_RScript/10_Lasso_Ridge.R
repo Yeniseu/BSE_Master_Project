@@ -83,7 +83,6 @@ get_best_lambda <- function(y, X, window_size, step, alpha_lasso) {
                                         lambda_grid[i], anchored=F)
     rolling_rmse[i] <- mean(rolling_res[[i]]$rmse[step])
   }
-
   # best lambda
   best_lam_index <- which.min(rolling_rmse)
   best_lam_and_mse <- c(lambda_grid[best_lam_index], rolling_rmse[best_lam_index])
