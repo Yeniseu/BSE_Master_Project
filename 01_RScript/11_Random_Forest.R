@@ -131,8 +131,7 @@ rf.rolling.window=function(Y,nprev,indice=1,lag=1){
 
 #### PREDICTIONS ####
 
-# First Out of Sample Predictions: 
-# Out of Sample Period : 2001-2015
+# FIRST Out of Sample Predictions: 2001-2015
 
 Y <- fred[date < "2016-01-01"]
 Y <- Y[, date := NULL]
@@ -147,7 +146,24 @@ rf1_1 <- rf.rolling.window(Y,nprev,1,1)
 
 rf1_3 <- rf.rolling.window(Y,nprev,1,3)
 
-
 rf1_1$errors
 rf1_1$pred
 
+
+# SECOND Out of Sample Predictions: 2016-2024
+
+Y <- fred
+Y <- Y[, date := NULL]
+Y <- as.matrix(Y)
+dim(Y)
+
+# Out of Sample Length = 108 (between years 2001-2015)
+nprev <- 108
+
+set.seed(123)
+rf2_1 <- rf.rolling.window(Y,nprev,1,1)
+
+rf2_3 <- rf.rolling.window(Y,nprev,1,3)
+
+rf2_1$errors
+rf2_3$pred
