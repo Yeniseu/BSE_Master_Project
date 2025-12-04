@@ -74,4 +74,5 @@ best_alpha <- alpha_search[rmse==min(rmse), alpha]
 ggplot(alpha_search_line1, aes(x=alpha, y=rmse)) + geom_line() + theme_light() + 
   geom_vline(xintercept=best_alpha, linetype="dashed", color="red") 
 
-#TODO  Add barchart for variable coefficients
+# TODO Add barchart for variable coefficients
+# TODO Forecast chart 
