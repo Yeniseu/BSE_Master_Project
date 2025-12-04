@@ -179,33 +179,38 @@ pca_impute <- function(X, ncomp = 3, maxiter = 100, tol = 1e-6, verbose = TRUE) 
 
 
 
-# Identify columns with missing values
-na_cols <- names(which(sapply(data_cleaned_withNA, function(x) any(is.na(x)))))
+# Use ALL numeric columns (excluding date) for imputation
+numeric_cols <- names(data_cleaned_withNA)[sapply(data_cleaned_withNA, is.numeric)]
+# Remove 'date' if it's in numeric_cols
+numeric_cols <- setdiff(numeric_cols, "date")
 
-# Extract those columns
-X_for_impute <- as.matrix(data_cleaned_withNA[, na_cols])
+# Extract ALL numeric columns
+X_for_impute <- as.matrix(data_cleaned_withNA[, numeric_cols])
 
-# Run the imputation (using 5 factors)
+# Run the imputation using ALL columns (using 5 factors)
 X_completed <- pca_impute(X_for_impute, ncomp = 5, verbose = TRUE)
 
-# 7. Put the completed data back
+# Put the completed data back
 data_cleaned <- data_cleaned_withNA
-data_cleaned[, na_cols] <- X_completed
+data_cleaned[, numeric_cols] <- X_completed
 
 # Verify no more NAs
 cat("\nFinal check - columns with NAs:", 
     sum(colSums(is.na(data_cleaned)) > 0), "\n")
 
-# 6. Compare means before and after
-cat("\n=== Comparison of means ===\n")
+# Compare means before and after (only for columns that had NAs)
+na_cols <- names(which(sapply(data_cleaned_withNA, function(x) any(is.na(x)))))
+
+cat("\n=== Comparison of means (variables with NAs) ===\n")
+cat("\nBefore imputation:\n")
 for (col in na_cols) {
   mean_val <- mean(data_cleaned_withNA[[col]], na.rm = TRUE)
   cat(sprintf("%s: %.5f\n", col, mean_val))
 }
 
-cat("\n=== Comparison of means ===\n")
+cat("\nAfter imputation:\n")
 for (col in na_cols) {
-  cat(sprintf("%s: %.4f\n", col, mean(data_cleaned[[col]])))
+  cat(sprintf("%s: %.5f\n", col, mean(data_cleaned[[col]])))
 }
 
 # Multiple CPIAUCSL by 100 to easily read it as inflation (After log transformation 5)
