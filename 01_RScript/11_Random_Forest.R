@@ -53,9 +53,10 @@ rf.rolling.window=function(Y,nprev,indice=1,lag=1){
   save.pred=matrix(NA,nprev,1)
   for(i in nprev:1){
     Y.window=Y[(1+nprev-i):(nrow(Y)-i),]
-    lasso=runrf(Y.window,indice,lag)
-    save.pred[(1+nprev-i),]=lasso$pred
-    save.importance[[i]]=importance(lasso$model)
+    random_forest=runrf(Y.window,indice,lag)
+    save.pred[(1+nprev-i),]=random_forest$pred
+    #save.importance[[i]]=importance(random_forest$model)
+    save.importance[[1 + nprev - i]] = importance(random_forest$model)
     cat("iteration",(1+nprev-i),"\n")
   }
   
@@ -138,20 +139,15 @@ Y <- Y[, date := NULL]
 Y <- as.matrix(Y)
 dim(Y)
 
-# Out of Sample Length = 132
-nprev <- 
+# Out of Sample Length = 180 (between years 2001-2015)
+nprev <- 180
 
 set.seed(123)
 rf1_1 <- rf.rolling.window(Y,nprev,1,1)
 
-rf3_1 <- rf.rolling.window(Y,nprev,1,3)
-
-rf <- rf.rolling.window(Y,nprev,1,6)
-
-rf1$errors
-rf1$pred
-
-str(rf1)
+rf1_3 <- rf.rolling.window(Y,nprev,1,3)
 
 
-2015- 2001 +1
+rf1_1$errors
+rf1_1$pred
+
