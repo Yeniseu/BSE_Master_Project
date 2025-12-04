@@ -21,6 +21,9 @@ setcolorder(fred, c("date", "inf"))
 
 # rf function
 runrf=function(Y,indice,lag){
+  
+  dum=Y[,ncol(Y)]
+  Y=Y[,-ncol(Y)]
   comp=princomp(scale(Y,scale=FALSE))
   Y2=cbind(Y,comp$scores[,1:4])
   aux=embed(Y2,4+lag)
@@ -34,12 +37,14 @@ runrf=function(Y,indice,lag){
     X.out=tail(X.out,1)[1:ncol(X)]
   }
   
-  #browser()
-  model=randomForest(X,y,importance=TRUE)
-  pred=predict(model,X.out)
+  dum=tail(dum,length(y))
+  
+  model=randomForest(cbind(X,dum),y,importance = TRUE)
+  pred=predict(model,c(X.out,0))
   
   return(list("model"=model,"pred"=pred))
 }
+
 
 # rolling window setting
 rf.rolling.window=function(Y,nprev,indice=1,lag=1){
