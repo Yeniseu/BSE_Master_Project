@@ -1,8 +1,14 @@
+# Author: Orhun Ozel
+# Date: 26/11/2025
+# Scope: Apply Random Forest
+rm(list = ls())
+source("01_RScript/00_Functions_Lasso.R")
 library(data.table)
 library(glmnet)
-library(caret)
-rm(list = ls())
-options(print.max = 300, scipen = 30, digits = 5)
+library(ggplot2)
+library(gt)
+library(scales)
+options(print.max = 300, scipen = 50, digits = 3)
 
 ### Load & prepare
 fred <- readRDS("02_Input/data_cleaned.rds")
@@ -10,127 +16,110 @@ setDT(fred)
 setnames(fred, "CPIAUCSL", "inf")
 setcolorder(fred, c("date", "inf"))
 
-take_lag_matrix <- function(data_matrix, lag_no) {
-  X <- as.matrix(data_matrix)
-  lagged_matrix <- rbind(
-    matrix(NA, lag_no, ncol(X)), 
-    X[1:(nrow(X)-lag_no),]
-  )
-  return(lagged_matrix)
-}
+fred <- fred[!is.na(inf),]  ## Remove rows if inflation is NA
+data <- fred[, -c("date")]  
+data <- data[, sapply(data, function(x) sum(is.na(x))==0), with = F]  # Drop cols with NA
+data <- as.matrix(data)
 
-all_dt <- fred[, -c("date")]
-all_dt <- cbind(all_dt, take_lag_matrix(all_dt, 1), take_lag_matrix(all_dt, 2),
-                take_lag_matrix(all_dt, 3), take_lag_matrix(all_dt, 4))
+fred[, which(date=="2000-12-01")]
+fred[, which(date=="2015-12-01")]
+dt_s1 <- data[1:fred[, which(date=="2015-12-01")], ]
+dt_s2 <- copy(data)
 
-all_dt <- na.omit(all_dt, cols = "inf")  ## Remove rows if inflation is NA
-Y    <- all_dt$inf
-Xdt  <- all_dt[, -c("inf")]  
-Xdt  <- Xdt[, sapply(Xdt, function(x) sum(is.na(x))==0), with = F]  # Drop cols with NA
-X    <- as.matrix(Xdt)
+### Run for different lags and samples
+## Parameter Selection Using Sample 1
+npred1 <- nrow(dt_s1) - fred[, which(date=="2000-12-01")]  # 180
+Y_train_val1 <- dt_s1[1:(nrow(dt_s1)-npred1),]
+#
+best_lam_lasso_all_1 <- get_best_lambda(Y_train_val1, npred1, 1, lag=1, alpha=1, nlambda=25)  #0.016912
+blam_l1 <- best_lam_lasso_all_1$best_lam  # best_lam_lasso_1
+#blam_l1 <- 0.016912  
+best_lam_ridge_all_1 <- get_best_lambda(Y_train_val1, npred1, 1, lag=1, alpha=0, nlambda=25)  #0.016912
+blam_r1 <- best_lam_ridge_all_1$best_lam  # best_lam_ridge_1
+#blam_r1 <- 2.0489
+best_alp_all_1 <- get_best_alpha(Y_train_val1, npred1, 1, lag=1, alpha_grid="el", lambda="auto")
+balp1 <- best_alp_all_1$best_alp # 0.6
+blam_e1 <- best_alp_all_1$best_lam # 0.6
+#balp_e1 <- 0.4
+#blam_e1 <- 0.049153 
 
-### Rolling glmnet with forward TS-CV for lambda
-
-
-roll_wind_fcast <- function(y, X, window_size, step=1, alpha_lasso, lambda_lasso, anchored=F, sample_skip=0, skip=2) {
-  # Create each rolling window, then forecast
-  y <- y[(sample_skip+1):length(y)]
-  X <- X[(sample_skip+1):nrow(X), , drop=F]
-  roll_index <- createTimeSlices(y, window_size, step, fixedWindow = T, skip = skip)
-  data_all <- cbind(y, X)
-  data_all <- take_lag_matrix(data_all, step)
-  train <- lapply(roll_index$train, function(x) data_all[x, ,drop=F])
-  test  <- lapply(roll_index$test , function(x) data_all[x, ,drop=F])
-  #browser()
-  y_true_all <- lapply(test, function(m) m[, "y"][step])
-  y_true_all <- as.matrix(list2DF(y_true_all))
-  y_hat_all  <- matrix(NA, nrow(y_true_all), ncol(y_true_all))
-  for (i in 1:length(train)) {
-    all_variables <- train[[i]]
-    all_variables <- na.omit(all_variables)
-    Y <- all_variables[, "y"]
-    X <- all_variables[,  colnames(all_variables) != "y"]
-    
-    # TS-CV: expanding k-step-ahead within the window
-    fit   <- glmnet(X, Y, alpha=alpha_lasso, lambda=lambda_lasso, standardize=T)
-    y_hat <- as.numeric(predict(fit, test[[i]][step, colnames(all_variables) != "y"], drop=F))
-    y_hat_all[,i] <- y_hat
-  }
-  bias_mean <- rowMeans(y_true_all - y_hat_all)
-  bias_percantage <- abs(bias_mean)/abs(rowMeans(y_true_all))*100
-  bias_mean
-  bias_percantage
-  rmse <- sqrt(rowMeans((y_true_all - y_hat_all)^2))
-  rolling_res <- list("rmse" = rmse, "forecast" = y_hat_all, "real" = y_true_all)
-  rolling_res
-}
-
-get_best_lambda <- function(y, X, window_size, step, alpha_lasso) {
- # browser()
-  # Create lambda grid automatically
-  lagged_X <- take_lag_matrix(X, 1)
-  fit0 <- glmnet(lagged_X[24:window_size, , drop = F], y[24:window_size], 
-                 alpha = alpha_lasso, standardize = T, nlambda = 40)
-  lambda_grid <- fit0$lambda
-  if(alpha_lasso == 1) {  # Remove lambda possibilities that does not change variable count
-    lambda_grid <- lambda_grid[fit0$df != shift(fit0$df, fill=-1)]  
-  }
-  rolling_res <- list(NA)
-  rolling_rmse <- NA
-  for (i in 1:length(lambda_grid)) {
-    #browser()
-    rolling_res[[i]] <- roll_wind_fcast(y, X, window_size, step=step, alpha_lasso, 
-                                        lambda_grid[i], anchored=F)
-    rolling_rmse[i] <- mean(rolling_res[[i]]$rmse[step])
-  }
-  # best lambda
-  best_lam_index <- which.min(rolling_rmse)
-  best_lam_and_mse <- c(lambda_grid[best_lam_index], rolling_rmse[best_lam_index])
-  return(best_lam_and_mse)
-}
-
-rolling_glmnet_ts <- function(y_all, X_all, window_size, train_size, step=1, alpha_lasso) {
-  # y_all vector. X_all matrix.
-  if(length(y_all) != nrow(X_all)) stop("Y and X lengths does not match")
-  y_train <- y_all[1:train_size]
-  X_train <- X_all[1:train_size, ,drop=F]
-  best_lam_and_rmse <- matrix(NA, length(alpha_lasso), 3) # Store alpha, best lambda and its rmse
-  for(i in 1:length(alpha_lasso)) {
-    lam_and_rmse <- get_best_lambda(y_train, X_train, window_size, step=1, alpha_lasso[i])
-    best_lam_and_rmse[i, ] <- c(alpha_lasso[i], lam_and_rmse)
-  }
-  best_comb_index <- which.min(best_lam_and_rmse[, 3])
-  best_alpha <- best_lam_and_rmse[best_comb_index, 1]
-  best_lam   <- best_lam_and_rmse[best_comb_index, 2]
-
-  #fit_full <- glmnet(X, y, alpha=alpha_lasso, lambda=best_lam, standardize=T)
-  skip_for_2001_2015 <- train_size-window_size
-  skip_for_2016_2025 <- skip_for_2001_2015 + (2016-2001)*12
-  
-  #browser()
-  rmse_sample1 <- NA
-  rmse_sample2 <- NA
-  for(i in 1:step) {
-    roll_fcast_1 <- roll_wind_fcast(y_all, X_all, window_size, step=i, best_alpha,
-                                    best_lam, anchored=F, sample_skip = skip_for_2001_2015)
-    roll_fcast_2 <- roll_wind_fcast(y_all, X_all, window_size, step=i, best_alpha,
-                                    best_lam, anchored=F, sample_skip = skip_for_2016_2025)
-    rmse_sample1[i] <- roll_fcast_1$rmse
-    rmse_sample2[i] <- roll_fcast_2$rmse
-  }
-  
-  all_res <- list(rmse_sample1, rmse_sample2)
-  all_res
-}
-
-### Run models
-w <- 360  # 30 years of monthly data
-t_s <- fred[, which(date=="2000-12-01")]
-pred_lasso <- rolling_glmnet_ts(Y, X, window_size=w, train_size=t_s, step=6, alpha_lasso=1)     # Lasso
-pred_ridge <- rolling_glmnet_ts(Y, X, window_size=w, train_size=t_s, step=6, alpha_lasso=0)     # Ridge
-pred_elnet <- rolling_glmnet_ts(Y, X, window_size=w, train_size=t_s, step=6, alpha_lasso=seq(0, 1, by = 0.1))   # Elastic Net
+## Sample 1: Train: 1960-01-01:2000-12-01.  Test: 2001-01-01:2015-12-01 
+lasso_s1_l1 <- lasso_roll_win(dt_s1, npred1, 1, lag=1, alpha=1    , lambda=blam_l1)
+lasso_s1_l3 <- lasso_roll_win(dt_s1, npred1, 1, lag=3, alpha=1    , lambda=blam_l1)
+ridge_s1_l1 <- lasso_roll_win(dt_s1, npred1, 1, lag=1, alpha=0    , lambda=blam_r1)
+ridge_s1_l3 <- lasso_roll_win(dt_s1, npred1, 1, lag=3, alpha=0    , lambda=blam_r1)
+elnet_s1_l1 <- lasso_roll_win(dt_s1, npred1, 1, lag=1, alpha=balp1, lambda=blam_e1)
+elnet_s1_l3 <- lasso_roll_win(dt_s1, npred1, 1, lag=3, alpha=balp1, lambda=blam_e1)
+rw_s1_l1 <- sqrt(mean((tail(dt_s1[, "inf"],npred1)-tail(shift(dt_s1[, "inf"],1),npred1))^2))
+rw_s1_l3 <- sqrt(mean((tail(dt_s1[, "inf"],npred1)-tail(shift(dt_s1[, "inf"],3),npred1))^2))
+window1 <- nrow(dt_s1)-npred1
+sm_s1_l1 <- sqrt(mean((tail(dt_s1[, "inf"],npred1)-sapply((1:npred1), function(x) mean(dt_s1[, "inf"][x+(1:window1)-1])))^2))
+sm_s1_l3 <- sqrt(mean((tail(dt_s1[, "inf"],npred1)-sapply((1:npred1), function(x) mean(dt_s1[, "inf"][x+(3:window1)-3])))^2))
 
 
+lapply((1:npred1), function(x) x+(1:window)-1)
+
+## Sample 2: Train: 1960-01-01:2015-12-01.  Test: 2016-01-01:2024-12-01
+npred2 <- nrow(fred) - fred[, which(date=="2015-12-01")]  # 108 as of 2024-12-01
+blam_l2 <- blam_l1
+blam_r2 <- blam_r1
+blam_e2 <- blam_e1
+balp2   <- balp1
+lasso_s2_l1 <- lasso_roll_win(dt_s2, npred2, 1, lag=1, alpha=1    , lambda=blam_l2)
+lasso_s2_l3 <- lasso_roll_win(dt_s2, npred2, 1, lag=3, alpha=1    , lambda=blam_l2)
+ridge_s2_l1 <- lasso_roll_win(dt_s2, npred2, 1, lag=1, alpha=0    , lambda=blam_r2)
+ridge_s2_l3 <- lasso_roll_win(dt_s2, npred2, 1, lag=3, alpha=0    , lambda=blam_r2)
+elnet_s2_l1 <- lasso_roll_win(dt_s2, npred2, 1, lag=1, alpha=balp2, lambda=blam_e2)
+elnet_s2_l3 <- lasso_roll_win(dt_s2, npred2, 1, lag=3, alpha=balp2, lambda=blam_e2)
+rw_s2_l1 <- sqrt(mean((tail(dt_s2[, "inf"],npred2)-tail(shift(dt_s2[, "inf"],1),npred2))^2))
+rw_s2_l3 <- sqrt(mean((tail(dt_s2[, "inf"],npred2)-tail(shift(dt_s2[, "inf"],3),npred2))^2))
+window2 <- nrow(dt_s2)-npred2
+sm_s2_l1 <- sqrt(mean((tail(dt_s2[, "inf"],npred2)-sapply((1:npred2), function(x) mean(dt_s2[, "inf"][x+(1:window2)-1])))^2))
+sm_s2_l3 <- sqrt(mean((tail(dt_s2[, "inf"],npred2)-sapply((1:npred2), function(x) mean(dt_s2[, "inf"][x+(3:window2)-3])))^2))
 
 
+### Create Charts
+## Lambda Grid Search
+lambda_search_lasso <- sapply(best_lam_lasso_all_1$all_res, function(x) c("lambda"=x$lambda, x$errors, "n"=sum(x$coef[1,] != 0)))
+lambda_search_ridge <- sapply(best_lam_ridge_all_1$all_res, function(x) c("lambda"=x$lambda, x$errors, "n"=sum(x$coef[1,] != 0)))
+lambda_lasso   <- as.data.table(t(lambda_search_lasso))
+lambda_ridge   <- as.data.table(t(lambda_search_ridge))
+best_lam_lasso <- lambda_lasso[rmse==min(rmse), lambda]
+best_lam_ridge <- lambda_ridge[rmse==min(rmse), lambda]
+
+ggplot(lambda_lasso, aes(x=lambda, y=rmse)) + geom_line() + theme_light() + 
+  geom_vline(xintercept=best_lam_lasso   , linetype="dashed", color="red") 
+ggplot(lambda_lasso) + aes(x=lambda, y =n   ) + geom_line() + theme_light() + 
+  geom_vline(xintercept=best_lam_lasso, linetype="dashed", color="red")
+ggplot(lambda_ridge, aes(x=lambda, y=rmse)) + geom_line() + theme_light() + 
+  geom_vline(xintercept=best_lam_ridge   , linetype="dashed", color="red") 
+
+## Alpha Grid Search for Elastic Net
+alpha_search <- sapply(best_alp_all_1$all_res, function(x) c("alpha"=x$alpha, "lambda"=x$lambda, x$errors))
+alpha_search <- as.data.table(t(alpha_search))
+alpha_search
+
+best_alpha <- alpha_search[rmse==min(rmse), alpha]
+ggplot(alpha_search_line1, aes(x=alpha, y=rmse)) + geom_line() + theme_light() + 
+  geom_vline(xintercept=best_alpha, linetype="dashed", color="red") 
+
+# TODO Add barchart for variable coefficients
+# TODO Forecast chart 
+
+table_elnet <- alpha_search |>
+  transform(best = rmse == min(rmse)) |>
+  gt() |>
+  tab_header(title = html("Table: Elastic Net &alpha; and &lambda; Tuning Results")) |>
+  cols_align(align = "center", columns = everything()) |>
+  data_color(
+    columns = rmse,
+    colors  = col_numeric(c("blue", "red"), range(alpha_search$rmse))
+  ) |>
+  tab_style(
+    style = list(cell_text(weight = "bold")),
+    locations = cells_body(rows = best)
+  ) |>
+  cols_hide(best)
+table_elnet
+gtsave(table_elnet, "03_Output/Tables/ElNet_Parameter_Tuning.html")
 

@@ -4,9 +4,12 @@
 
 library(data.table)
 library(randomForest)
+library(ggplot2)
 
 rm(list = ls())
 options(print.max = 300, scipen = 30, digits = 5)
+
+source("01_RScript/00_Functions_RF.R")
 
 #### Load & prepare ####
 
@@ -17,72 +20,136 @@ dim(fred)
 setnames(fred, "CPIAUCSL", "inf")
 setcolorder(fred, c("date", "inf"))
 
-#### FUNCTIONS ####
-
-# rf function
-runrf=function(Y,indice,lag){
-  comp=princomp(scale(Y,scale=FALSE))
-  Y2=cbind(Y,comp$scores[,1:4])
-  aux=embed(Y2,4+lag)
-  y=aux[,indice]
-  X=aux[,-c(1:(ncol(Y2)*lag))]  
-  
-  if(lag==1){
-    X.out=tail(aux,1)[1:ncol(X)]  
-  }else{
-    X.out=aux[,-c(1:(ncol(Y2)*(lag-1)))]
-    X.out=tail(X.out,1)[1:ncol(X)]
-  }
-  
-  #browser()
-  model=randomForest(X,y,importance=TRUE)
-  pred=predict(model,X.out)
-  
-  return(list("model"=model,"pred"=pred))
-}
-
-# rolling window setting
-rf.rolling.window=function(Y,nprev,indice=1,lag=1){
-  
-  save.importance=list()
-  save.pred=matrix(NA,nprev,1)
-  for(i in nprev:1){
-    Y.window=Y[(1+nprev-i):(nrow(Y)-i),]
-    lasso=runrf(Y.window,indice,lag)
-    save.pred[(1+nprev-i),]=lasso$pred
-    save.importance[[i]]=importance(lasso$model)
-    cat("iteration",(1+nprev-i),"\n")
-  }
-  
-  real=Y[,indice]
-  plot(real,type="l")
-  lines(c(rep(NA,length(real)-nprev),save.pred),col="red")
-  
-  rmse=sqrt(mean((tail(real,nprev)-save.pred)^2))
-  mae=mean(abs(tail(real,nprev)-save.pred))
-  errors=c("rmse"=rmse,"mae"=mae)
-  
-  return(list("pred"=save.pred,"errors"=errors,"save.importance"=save.importance))
-}
-
-
-#### PREDICTIONS ####
-
-# First Out of Sample Predictions: 
-# Out of Sample Period : 2001-2015
+#### TUNING ####
 
 Y <- fred[date < "2001-01-01"]
 Y <- Y[, date := NULL]
 Y <- as.matrix(Y)
 dim(Y)
 
-# Out of Sample Length = 132
-nprev <- 132
+# Validation Data Length = 120 (between years 1991-2000)
+nprev <- 120
+
+# mtry grid
+p = 520 # number of features
+mtry_grid <- c(2, 3, 5, 8, 10, 15, 25, round(p/10), round(p/8), round(p/6), round(p/4),
+               round(p/3), round(p/2))
+
+results_mtry <- data.frame(
+  mtry = mtry_grid,
+  rmse = NA_real_,
+  mae  = NA_real_
+)
+
+# Grid search
+for (k in seq_along(mtry_grid)) {
+  cat("\n==== Testing mtry =", mtry_grid[k], "====\n")
+  
+  set.seed(123)
+  out_k <- rf.rolling.window_tune_mtry(Y, nprev, 1, 1, nfeature = mtry_grid[k])
+  results_mtry$rmse[k] <- out_k$errors["rmse"]
+  results_mtry$mae[k]  <- out_k$errors["mae"]
+}
+
+results_mtry
+
+# best mtry
+best_idx  <- which.min(results_mtry$rmse)
+best_mtry <- results_mtry$mtry[best_idx]
+
+best_mtry
+
+saveRDS(results_mtry, file = "03_Output/rfres_mtry.rds")
+
+#results_mtry <- readRDS("03_Output/rfres_mtry.rds")
+
+# plot
+plot_mtry <- ggplot(results_mtry, aes(x = mtry, y = rmse)) +
+  geom_line() +
+  geom_point(size = 2) +
+  geom_vline(xintercept = best_mtry, linetype = "dashed", color = "red") +
+  scale_x_continuous(breaks = results_mtry$mtry) +
+  theme_light() +
+  theme(
+    axis.text.x  = element_text(angle = 90, hjust = 1, size = 14),
+    axis.text.y  = element_text(size = 14),
+    axis.title.x = element_text(size = 16),
+    axis.title.y = element_text(size = 16),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.x = element_blank()
+  )
+
+ggsave(
+  filename = "03_Output/Charts/rf/mtry_tuning.png",
+  plot     = plot_mtry,
+  width    = 12,
+  height   = 6,
+  dpi      = 300
+)
+
+
+#### PREDICTIONS ####
+
+# Tuning Result: Best mtry result
+best_mtry <- 52
+
+# FIRST Out of Sample Predictions: 2001-2015
+
+Y <- fred[date < "2016-01-01"]
+Y[inf == min(inf), date] # "2008-11-01"
+Y <- Y[, date := NULL]
+Y <- as.matrix(Y)
+dim(Y)
+
+# Dummy for 
+dum=rep(0,nrow(Y))
+dum[which.min(Y[,1])]=1
+Y=cbind(Y,dum=dum)
+
+# Out of Sample Length = 180 (between years 2001-2015)
+nprev <- 180
 
 set.seed(123)
-rf1 <- rf.rolling.window(Y,nprev,1,1)
 
-rf1$errors
-rf1$pred
+rf1_1 <- rf.rolling.window(Y,nprev,1,1)
+saveRDS(rf1_1, file= "03_Output/rf1_1.rds")
 
-str(rf1)
+
+rf1_1$errors
+#rf1_1$pred
+
+
+rf1_3 <- rf.rolling.window(Y,nprev,1,3)
+saveRDS(rf1_3, file= "03_Output/rf1_3.rds")
+
+
+rf1_3$errors
+#rf1_3$pred
+
+
+
+# SECOND Out of Sample Predictions: 2016-2024
+
+# Tuning Result: Best mtry result
+best_mtry <- 52
+
+Y <- fred
+Y <- Y[, date := NULL]
+Y <- as.matrix(Y)
+dim(Y)
+
+# Out of Sample Length = 108 (between years 2001-2015)
+nprev <- 108
+
+set.seed(123)
+rf2_1 <- rf.rolling.window(Y,nprev,1,1)
+saveRDS(rf2_1, file= "03_Output/rf2_1.rds")
+
+rf2_1$errors
+#rf2_1$pred
+
+rf2_3 <- rf.rolling.window(Y,nprev,1,3)
+saveRDS(rf2_3, file= "03_Output/rf2_3.rds")
+
+rf2_3$errors
+#rf2_3$pred

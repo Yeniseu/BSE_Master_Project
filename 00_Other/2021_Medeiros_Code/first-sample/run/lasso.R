@@ -1,13 +1,15 @@
-source("modelfunctions/func-lasso.R")
+source("00_Other/2021_Medeiros_Code/first-sample/functions/func-lasso.R")
+#library("devtools")
+#install_github("https://github.com/gabrielrvsc/HDeconometrics")
 library(HDeconometrics)
-load("dados/rawdata2000.rda")
+load("00_Other/2021_Medeiros_Code/first-sample/rawdata.rda")
 Y=dados
 
 nprev=132
 alpha=1
 
 ## == passado == ##
-
+Y[, "CPI"] <- Y[, "CPI"]*100
 lasso1c=lasso.rolling.window(Y,nprev,1,1,alpha,type="lasso")
 lasso1p=lasso.rolling.window(Y,nprev,2,1,alpha,type="lasso")
 lasso2c=lasso.rolling.window(Y,nprev,1,2,alpha,type="lasso")

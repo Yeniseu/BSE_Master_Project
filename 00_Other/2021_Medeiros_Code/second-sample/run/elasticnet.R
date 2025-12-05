@@ -1,16 +1,16 @@
-source("modelfunctions/functionsD/func-lasso.R")
+source("00_Other/2021_Medeiros_Code/second-sample/functions/func-lasso.R")
 library(HDeconometrics)
-load("dados/rawdata.RData")
+load("00_Other/2021_Medeiros_Code/second-sample/rawdata.RData")
 Y=dados
 dum=rep(0,nrow(Y))
 dum[which.min(Y[,1])]=1
 Y=cbind(Y,dum=dum)
+Y[,"CPI"] <- Y[,"CPI"]*100
 
 nprev=180
 alpha=0.5
 
 ## == presente == ##
-
 elasticnet1c=lasso.rolling.window(Y,nprev,1,1,alpha,type="lasso")
 elasticnet1p=lasso.rolling.window(Y,nprev,2,1,alpha,type="lasso")
 elasticnet2c=lasso.rolling.window(Y,nprev,1,2,alpha,type="lasso")

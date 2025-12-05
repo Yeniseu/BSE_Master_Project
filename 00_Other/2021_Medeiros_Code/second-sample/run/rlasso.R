@@ -11,7 +11,7 @@ nprev=180
 alpha=1
 
 ## == presente == ##
-
+Y[, "CPI"] <- Y[, "CPI"]*100
 rlasso1c=lasso.rolling.window(Y,nprev,1,1)
 rlasso1p=lasso.rolling.window(Y,nprev,2,1)
 rlasso2c=lasso.rolling.window(Y,nprev,1,2)
