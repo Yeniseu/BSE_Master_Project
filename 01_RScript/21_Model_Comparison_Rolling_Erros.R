@@ -2,6 +2,7 @@
 # Date: 5/12/2025
 # Scope: Rolling RMSE for Model Comparison
 
+rm(list = ls())
 library(ggplot2)
 library(data.table)
 
@@ -197,6 +198,8 @@ ggsave(
 
 #### Comparison for Second Out of Sample Period ####
 
+rm(list = ls())
+
 lasso2 <- readRDS("03_Output/lasso_pred_s2.rds")
 
 lasso2_1 <- lasso2[, c("real", "lasso_l1", "ridge_l1", "elnet_l1", "rw_l1")]
@@ -239,3 +242,138 @@ setnames(rf2_3, "V1", "RF")
 
 all2_1 <- cbind(lasso2_1, mean2_h1, p2_h1_ar4, rf2_1)
 all2_3 <- cbind(lasso2_3, mean2_h3, p2_h3_ar4, rf2_3)
+
+
+
+
+#### Calculate Cumulative Absolute Errors ####
+
+#### Sample 2, Horizon 1 ####
+
+all2_1_err <- copy(all2_1)
+cols <- setdiff(names(all2_1_err), "real")
+all2_1_err[, (cols) := lapply(.SD, function(x) abs(x - real)), .SDcols = cols]
+all2_1_err[, real := NULL]
+
+all2_1_cum <- copy(all2_1_err)
+all2_1_cum[, (names(all2_1_cum)) := lapply(.SD, cumsum)]
+
+dates <- seq(
+  from = as.Date("2016-01-01"),
+  to   = as.Date("2024-12-01"),
+  by   = "month"
+)
+
+stopifnot(length(dates) == nrow(all2_1_cum))
+all2_1_cum[, date := dates]
+setcolorder(all2_1_cum, c("date", "RW", "RSM", "AR"))
+
+# wide -> long
+all2_1_cum_long <- melt(
+  all2_1_cum,
+  id.vars = "date",
+  variable.name = "model",
+  value.name = "cum_abs_error"
+)
+
+# plot
+
+cum_err_p2_h1 <- ggplot(all2_1_cum_long, 
+                        aes(x = date, y = cum_abs_error, colour = model)) +
+  geom_line(size = 0.9) +
+  theme_light() +
+  scale_x_date(date_breaks = "3 year", date_labels = "%Y") +
+  labs(
+    title = "Cumulative Absolute Errors (2001–2015, horizon = 1)",
+    x = "",
+    y = "Cumulative absolute error",
+    colour = "Model"
+  ) +
+  theme(
+    plot.title  = element_text(size = 18, face = "bold", hjust = 0.5),
+    axis.title.x = element_text(size = 16),
+    axis.title.y = element_text(size = 16),
+    axis.text.x  = element_text(size = 14, angle = 0, hjust = 0.5),
+    axis.text.y  = element_text(size = 12),
+    legend.text  = element_text(size = 12),
+    legend.title = element_text(size = 13)
+  )
+cum_err_p2_h1
+
+ggsave(
+  filename = "03_Output/Charts/cum_err_p2_h1.png",
+  plot     = cum_err_p2_h1,
+  width    = 12,
+  height   = 6,
+  dpi      = 300
+)
+
+
+#### Sample 2, Horizon 3 ####
+
+
+all2_3_err <- copy(all2_3)
+cols <- setdiff(names(all2_3_err), "real")
+all2_3_err[, (cols) := lapply(.SD, function(x) abs(x - real)), .SDcols = cols]
+all2_3_err[, real := NULL]
+
+all2_3_cum <- copy(all2_3_err)
+all2_3_cum[, (names(all2_3_cum)) := lapply(.SD, cumsum)]
+
+dates <- seq(
+  from = as.Date("2016-01-01"),
+  to   = as.Date("2024-12-01"),
+  by   = "month"
+)
+
+stopifnot(length(dates) == nrow(all2_3_cum))
+all2_3_cum[, date := dates]
+setcolorder(all2_3_cum, c("date", "RW", "RSM", "AR"))
+
+# wide -> long
+all2_3_cum_long <- melt(
+  all2_3_cum,
+  id.vars = "date",
+  variable.name = "model",
+  value.name = "cum_abs_error"
+)
+
+# plot
+
+cum_err_p2_h3 <- ggplot(all2_3_cum_long, 
+                        aes(x = date, y = cum_abs_error, colour = model)) +
+  geom_line(size = 0.9) +
+  theme_light() +
+  scale_x_date(date_breaks = "3 year", date_labels = "%Y") +
+  labs(
+    title = "Cumulative Absolute Errors (2001–2015, horizon = 3)",
+    x = "",
+    y = "Cumulative absolute error",
+    colour = "Model"
+  ) +
+  theme(
+    plot.title  = element_text(size = 18, face = "bold", hjust = 0.5),
+    axis.title.x = element_text(size = 16),
+    axis.title.y = element_text(size = 16),
+    axis.text.x  = element_text(size = 14, angle = 0, hjust = 0.5),
+    axis.text.y  = element_text(size = 12),
+    legend.text  = element_text(size = 12),
+    legend.title = element_text(size = 13)
+  )
+cum_err_p2_h3
+
+ggsave(
+  filename = "03_Output/Charts/cum_err_p2_h3.png",
+  plot     = cum_err_p2_h3,
+  width    = 12,
+  height   = 6,
+  dpi      = 300
+)
+
+
+
+
+
+
+
+
