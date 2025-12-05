@@ -40,7 +40,7 @@ best_lam_ridge_all_1 <- get_best_lambda(Y_train_val1, npred1, 1, lag=1, alpha=0,
 blam_r1 <- best_lam_ridge_all_1$best_lam  # 1.57
 #blam_r1 <- 1.57
 # Select Alpha and Lambda for ElNet Lag1
-best_alp_all_1 <- get_best_alpha(Y_train_val1, npred1, 1, lag=1, alpha_grid="el", lambda="auto")
+best_alp_all_1 <- get_best_alpha(Y_train_val1, npred1, 1, lag=1, alpha_grid="el", lambda="auto", nlambda=15)
 balp1   <- best_alp_all_1$best_alp  # 0.4
 blam_e1 <- best_alp_all_1$best_lam  # 0.6
 #balp_e1 <- 0.4
@@ -96,7 +96,7 @@ sm_s2_l1 <- sqrt(mean((tail(dt_s2[, "inf"],npred2)-sapply((1:npred2), function(x
 sm_s2_l3 <- sqrt(mean((tail(dt_s2[, "inf"],npred2)-sapply((1:npred2), function(x) mean(dt_s2[, "inf"][x+(3:window2)-3])))^2))
 
 
-### Save Results
+### Save Prediction Results
 rw_s1_l1_pred <- tail(shift(dt_s1[, "inf"],1),npred1)
 rw_s1_l3_pred <- tail(shift(dt_s1[, "inf"],3),npred1)
 rw_s2_l1_pred <- tail(shift(dt_s2[, "inf"],1),npred2)
@@ -113,49 +113,4 @@ lasso_pred_s2 <- data.table(real=lasso_s2_l1$real,
                             rw_l1   =rw_s2_l1_pred   , rw_l3   =rw_s2_l3_pred)
 saveRDS(lasso_pred_s1, "03_Output/lasso_pred_s1.rds")
 saveRDS(lasso_pred_s2, "03_Output/lasso_pred_s2.rds")
-
-### Create Charts
-## Lambda Grid Search
-lambda_search_lasso <- sapply(best_lam_lasso_all_1$all_res, function(x) c("lambda"=x$lambda, x$errors, "n"=sum(x$coef[1,] != 0)))
-lambda_search_ridge <- sapply(best_lam_ridge_all_1$all_res, function(x) c("lambda"=x$lambda, x$errors, "n"=sum(x$coef[1,] != 0)))
-lambda_lasso   <- as.data.table(t(lambda_search_lasso))
-lambda_ridge   <- as.data.table(t(lambda_search_ridge))
-best_lam_lasso <- lambda_lasso[rmse==min(rmse), lambda]
-best_lam_ridge <- lambda_ridge[rmse==min(rmse), lambda]
-
-ggplot(lambda_lasso, aes(x=lambda, y=rmse)) + geom_line() + theme_light() + 
-  geom_vline(xintercept=best_lam_lasso   , linetype="dashed", color="red") 
-ggplot(lambda_lasso) + aes(x=lambda, y =n   ) + geom_line() + theme_light() + 
-  geom_vline(xintercept=best_lam_lasso, linetype="dashed", color="red")
-ggplot(lambda_ridge, aes(x=lambda, y=rmse)) + geom_line() + theme_light() + 
-  geom_vline(xintercept=best_lam_ridge   , linetype="dashed", color="red") 
-
-## Alpha Grid Search for Elastic Net
-alpha_search <- sapply(best_alp_all_1$all_res, function(x) c("alpha"=x$alpha, "lambda"=x$lambda, x$errors))
-alpha_search <- as.data.table(t(alpha_search))
-alpha_search
-
-best_alpha <- alpha_search[rmse==min(rmse), alpha]
-ggplot(alpha_search_line1, aes(x=alpha, y=rmse)) + geom_line() + theme_light() + 
-  geom_vline(xintercept=best_alpha, linetype="dashed", color="red") 
-
-# TODO Add barchart for variable coefficients
-# TODO Forecast chart 
-
-table_elnet <- alpha_search |>
-  transform(best = rmse == min(rmse)) |>
-  gt() |>
-  tab_header(title = html("Table: Elastic Net &alpha; and &lambda; Tuning Results")) |>
-  cols_align(align = "center", columns = everything()) |>
-  data_color(
-    columns = rmse,
-    colors  = col_numeric(c("blue", "red"), range(alpha_search$rmse))
-  ) |>
-  tab_style(
-    style = list(cell_text(weight = "bold")),
-    locations = cells_body(rows = best)
-  ) |>
-  cols_hide(best)
-table_elnet
-gtsave(table_elnet, "03_Output/Tables/ElNet_Parameter_Tuning.html")
 

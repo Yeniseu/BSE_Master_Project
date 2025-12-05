@@ -5,9 +5,10 @@ runlasso <- function(Y, indice, lag, alpha=1, type="lasso", lambda, learn_lambda
   comp <- princomp(scale(Y,scale=FALSE))
   Y2   <- cbind(Y,comp$scores[,1:4])
   aux  <- embed(Y2,4+lag)
+  colnames(aux) <-   paste(colnames(Y2), sep="_l", rep(0:(4+lag-1), each=length(colnames(Y2))))
   y    <- aux[,indice]
   X    <- aux[,-c(1:(ncol(Y2)*lag))]  
-  
+
   if(learn_lambda_grid == T){
     fit_lambdas <- glmnet(X, y, alpha=alpha, standardize=T, nlambda = nlambda)
     lambda_grid <- fit_lambdas$lambda
@@ -49,8 +50,9 @@ runlasso <- function(Y, indice, lag, alpha=1, type="lasso", lambda, learn_lambda
     model   <- ic.glmnet(cbind(scale(X),dum),y,penalty.factor = penalty,alpha=alpha)
   }
   #browser()
+  #browser()
   pred <- predict(model, c(X.out,0))
-  return(list("model"=model,"pred"=pred))
+  return(list("model"=model,"pred"=pred, "coef_names"=c(colnames(X),"dum")))
 }
 
 
@@ -94,16 +96,16 @@ lasso_roll_win <- function(Y,npred,indice=1,lag=1,alpha=1, type="lasso", lambda,
   errors <- c("rmse"=rmse,"mae"=mae)
   
   return(list("pred"=as.numeric(save.pred),"real"=tail(real,npred),
-              "coef"=save.coef,"errors"=errors))
+              "coef"=save.coef, "coef_names"=lasso$coef_names, "errors"=errors))
 }
 
 
-get_best_alpha <- function(Y, npred, indice=1, lag=1, alpha_grid="el", lambda="auto", plot=F) {
+get_best_alpha <- function(Y, npred, indice=1, lag=1, alpha_grid="el", lambda="auto", plot=F, nlambda=25) {
   if(alpha_grid == "el") alpha_grid <- seq(0, 1, 0.1)
   save_res <- list(NA)
   for (i in 1:length(alpha_grid)) {
     if (lambda == "auto") {
-      best_lam_all <- get_best_lambda(Y, npred, indice, lag, alpha=alpha_grid[i], nlambda=15)
+      best_lam_all <- get_best_lambda(Y, npred, indice, lag, alpha=alpha_grid[i], nlambda=nlambda)
       lambda_sel <- best_lam_all$best_lam 
     }
     new_res <- lasso_roll_win(Y, npred, indice, lag, alpha_grid[i], "lasso", lambda_sel, plot=plot)
