@@ -4,6 +4,7 @@
 
 library(data.table)
 library(randomForest)
+library(ggplot2)
 
 rm(list = ls())
 options(print.max = 300, scipen = 30, digits = 5)
@@ -58,17 +59,17 @@ best_mtry <- results_mtry$mtry[best_idx]
 
 best_mtry
 
+ggplot(results_mtry, aes(x=mtry, y=rmse)) + geom_line() + theme_light() + 
+  geom_vline(xintercept=best_mtry, linetype="dashed", color="red")
+saveRDS(results_mtry, file = "03_Output/rfres_mtry.rds")
 
 
-
-
-
-
-set.seed(123)
-
-rf1_1 <- rf.rolling.window(Y,nprev,1,1)
+#results_mtry <- readRDS("03_Output/rfres_mtry.rds")
 
 #### PREDICTIONS ####
+
+# Tuning Result: Best mtry result
+best_mtry <- 52
 
 # FIRST Out of Sample Predictions: 2001-2015
 
@@ -83,10 +84,14 @@ nprev <- 180
 set.seed(123)
 rf1_1 <- rf.rolling.window(Y,nprev,1,1)
 
+saveRDS(rf1_1, file= "03_Output/rf1_1.rds")
+
+
 rf1_3 <- rf.rolling.window(Y,nprev,1,3)
 
 rf1_1$errors
 rf1_1$pred
+
 
 
 # SECOND Out of Sample Predictions: 2016-2024
