@@ -11,9 +11,12 @@ runlasso <- function(Y, indice, lag, alpha=1, type="lasso", lambda, learn_lambda
   if(learn_lambda_grid == T){
     fit_lambdas <- glmnet(X, y, alpha=alpha, standardize=T, nlambda = nlambda)
     lambda_grid <- fit_lambdas$lambda
-    if(alpha == 1) {  # Remove lambdas that does not change variable count
+    if(alpha != 0) {  # Remove lambdas that does not change variable count
       lambda_grid <- lambda_grid[fit_lambdas$df != shift(fit_lambdas$df, fill=-1)]  
     }
+    if(alpha != 1) { # Ridge's and Elnet's optimum resides in the minimum lambdas, temporary fix it
+      lambda_grid <- lambda_grid/5
+    } 
     return(lambda_grid)
   }
   
