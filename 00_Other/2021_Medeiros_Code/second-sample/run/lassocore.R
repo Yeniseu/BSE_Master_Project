@@ -1,6 +1,6 @@
-source("modelfunctions/func-lasso.R")
+source("00_Other/2021_Medeiros_Code/second-sample/functions/func-lasso.R")
 library(HDeconometricsBeta)
-load("dados/rawdata.RData")
+load("00_Other/2021_Medeiros_Code/second-sample/rawdata.RData")
 core=openxlsx::read.xlsx("dados/core.xlsx")
 core$core=c(NA,diff(log(core$CPILFENS)))
 core=core%>%filter(DATE>="1960-02-01")

@@ -53,13 +53,13 @@ runlasso <- function(Y, indice, lag, alpha=1, type="lasso", lambda, learn_lambda
 
 get_best_lambda <- function(Y,npred,indice=1,lag=1,alpha=1, type="lasso", nlambda=25, window = 360, plot=F) {
   # Create lambda grid automatically
-  Y_train_validate <- Y[1:(nrow(Y)-npred),]
-  lambda_grid <- runlasso(Y_train_validate,indice,lag,alpha,type,0,learn_lambda_grid=T, nlambda=nlambda)
+  #Y_train_validate <- Y[1:(nrow(Y)-npred),]
+  lambda_grid <- runlasso(Y,indice,lag,alpha,type,0,learn_lambda_grid=T, nlambda=nlambda)
   # Check the grid one by one
-  n_validate <- nrow(Y_train_validate)-window
+  n_validate <- nrow(Y)-window
   save_res <- list(NA)
   for (i in 1:length(lambda_grid)) {
-    new_res <- lasso_roll_win(Y_train_validate, n_validate, indice,lag,alpha,type,lambda_grid[i], plot=plot)
+    new_res <- lasso_roll_win(Y, n_validate, indice,lag,alpha,type,lambda_grid[i], plot=plot)
     save_res[[i]] <- c(list("lambda"=lambda_grid[i]), new_res)
   }
   # Select best lambda with lowest rmse
@@ -73,13 +73,13 @@ get_best_lambda <- function(Y,npred,indice=1,lag=1,alpha=1, type="lasso", nlambd
 lasso_roll_win <- function(Y,npred,indice=1,lag=1,alpha=1, type="lasso", lambda, plot=T) {
   save.coef <- matrix(NA,npred,21-3+ncol(Y[,-1])*4-1 )
   save.pred <- matrix(NA,npred,1)
-
+  cat("\n iteration \n")
   for(i in npred:1){
     Y.window <- Y[(1+npred-i):(nrow(Y)-i),]
     lasso    <- runlasso(Y.window,indice,lag,alpha,type,lambda)
     save.coef[(1+npred-i),] <- as.vector(lasso$model$beta)
     save.pred[(1+npred-i),] <- lasso$pred
-    cat("iteration",(1+npred-i),"\n")
+    cat((1+npred-i),"")
   }
   real <- Y[,indice]
   if(plot == T) {
@@ -95,17 +95,22 @@ lasso_roll_win <- function(Y,npred,indice=1,lag=1,alpha=1, type="lasso", lambda,
 }
 
 
-get_best_alpha <- function(Y, npred, indice=1, lag=1, alpha_grid="el", lambda, plot=F) {
+get_best_alpha <- function(Y, npred, indice=1, lag=1, alpha_grid="el", lambda="auto", plot=F) {
   if(alpha_grid == "el") alpha_grid <- seq(0, 1, 0.1)
   save_res <- list(NA)
-  for(i in 1:length(alpha_grid)) {
-    new_res <- lasso_roll_win(Y, npred, indice, lag, alpha_grid[i], "lasso", lambda, plot=plot)
-    save_res[[i]] <- c(list("alpha" = alpha_grid[i]), new_res)  # Append the list
+  for (i in 1:length(alpha_grid)) {
+    if (lambda == "auto") {
+      best_lam_all <- get_best_lambda(Y, npred, indice, lag, alpha=alpha_grid[i], nlambda=15)
+      lambda_sel <- best_lam_all$best_lam 
+    }
+    new_res <- lasso_roll_win(Y, npred, indice, lag, alpha_grid[i], "lasso", lambda_sel, plot=plot)
+    save_res[[i]] <- c(list("alpha"=alpha_grid[i], "lambda"=lambda_sel), new_res)  # Append the list
   }
   # Select best alpha with lowest rmse
   rmse <- sapply(save_res, function(x) x$errors[1])
   best_alp <- alpha_grid[which.min(rmse)]
-  best_alp_all <- list(best_lam = best_alp, all_res = save_res)
+  best_lam <- sapply(save_res, function(x) x$lambda)[which.min(rmse)]
+  best_alp_all <- list("best_alp"=best_alp, "best_lam"=best_lam, "all_res"=save_res)
   return(best_alp_all)
 }
 

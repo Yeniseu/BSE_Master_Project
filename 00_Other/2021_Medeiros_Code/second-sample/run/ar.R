@@ -1,16 +1,16 @@
-source("modelfunctions/functionsD/func-ar.R")
+source("00_Other/2021_Medeiros_Code/second-sample/functions/func-ar.R")
 library(HDeconometrics)
-load("dados/rawdata.RData")
+load("00_Other/2021_Medeiros_Code/second-sample/rawdata.RData")
 Y=dados
 dum=rep(0,nrow(Y))
 dum[which.min(Y[,1])]=1
 Y=cbind(Y,dum=dum)
+Y[,"CPI"] <- Y[,"CPI"]*100
 
 nprev=180
 
 
 ## == presente == ##
-
 ar1c=ar.rolling.window(Y,nprev,1,1,type="fixed")
 ar1p=ar.rolling.window(Y,nprev,2,1,type="fixed")
 ar2c=ar.rolling.window(Y,nprev,1,2,type="fixed")

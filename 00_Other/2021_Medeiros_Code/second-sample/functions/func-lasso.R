@@ -30,7 +30,7 @@ runlasso=function(Y,indice,lag,alpha=1,type="lasso"){
   }
   
   
-  model=ic.glmnet(cbind(scale(X),dum),y,alpha = alpha)
+  model=ic.glmnet(cbind(X,dum),y,alpha = alpha, scale=T)
   coef=model$coef
   if(type=="adalasso"){
     penalty=(abs(coef[-1])+1/sqrt(length(y)))^(-1)
