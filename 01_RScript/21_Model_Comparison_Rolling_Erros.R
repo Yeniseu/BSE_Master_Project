@@ -2,6 +2,9 @@
 # Date: 5/12/2025
 # Scope: Rolling RMSE for Model Comparison
 
+library(ggplot2)
+library(data.table)
+
 #### Comparison for First Out of Sample Period ####
 
 lasso1 <- readRDS("03_Output/lasso_pred_s1.rds")
@@ -47,7 +50,10 @@ setnames(rf1_3, "V1", "RF")
 all1_1 <- cbind(lasso1_1, mean1_h1, p1_h1_ar4, rf1_1)
 all1_3 <- cbind(lasso1_3, mean1_h3, p1_h3_ar4, rf1_3)
 
-# Calculate Cumulative Absolute Errors
+#### Calculate Cumulative Absolute Errors ####
+
+#### Sample 1, Horizon 1 ####
+
 all1_1_err <- copy(all1_1)
 cols <- setdiff(names(all1_1_err), "real")
 all1_1_err[, (cols) := lapply(.SD, function(x) abs(x - real)), .SDcols = cols]
@@ -55,6 +61,135 @@ all1_1_err[, real := NULL]
 
 all1_1_cum <- copy(all1_1_err)
 all1_1_cum[, (names(all1_1_cum)) := lapply(.SD, cumsum)]
+
+dates <- seq(
+  from = as.Date("2001-01-01"),
+  to   = as.Date("2015-12-01"),
+  by   = "month"
+)
+
+stopifnot(length(dates) == nrow(all1_1_cum))
+all1_1_cum[, date := dates]
+setcolorder(all1_1_cum, c("date", "RW", "RSM", "AR"))
+
+# wide -> long
+all1_1_cum_long <- melt(
+  all1_1_cum,
+  id.vars = "date",
+  variable.name = "model",
+  value.name = "cum_abs_error"
+)
+
+# plot
+cum_err_p1_h1 <- ggplot(all1_1_cum_long, aes(x = date, y = cum_abs_error, colour = model)) +
+  geom_line(size = 0.8) +
+  theme_light() +
+  scale_x_date(date_breaks = "3 year", date_labels = "%Y") +
+  labs(
+    y = "Cumulative absolute error",
+    colour = "Model"
+  )
+
+cum_err_p1_h1 <- ggplot(all1_1_cum_long, 
+                        aes(x = date, y = cum_abs_error, colour = model)) +
+  geom_line(size = 0.9) +
+  theme_light() +
+  scale_x_date(date_breaks = "3 year", date_labels = "%Y") +
+  labs(
+    title = "Cumulative Absolute Errors (2001–2015, horizon = 1)",
+    x = "",
+    y = "Cumulative absolute error",
+    colour = "Model"
+  ) +
+  theme(
+    plot.title  = element_text(size = 18, face = "bold", hjust = 0.5),
+    axis.title.x = element_text(size = 16),
+    axis.title.y = element_text(size = 16),
+    axis.text.x  = element_text(size = 14, angle = 0, hjust = 0.5),
+    axis.text.y  = element_text(size = 12),
+    legend.text  = element_text(size = 12),
+    legend.title = element_text(size = 13)
+  )
+cum_err_p1_h1
+
+ggsave(
+  filename = "03_Output/Charts/cum_err_p1_h1.png",
+  plot     = cum_err_p1_h1,
+  width    = 12,
+  height   = 6,
+  dpi      = 300
+)
+
+
+#### Sample 1, Horizon 3 ####
+
+
+all1_3_err <- copy(all1_3)
+cols <- setdiff(names(all1_3_err), "real")
+all1_3_err[, (cols) := lapply(.SD, function(x) abs(x - real)), .SDcols = cols]
+all1_3_err[, real := NULL]
+
+all1_3_cum <- copy(all1_3_err)
+all1_3_cum[, (names(all1_3_cum)) := lapply(.SD, cumsum)]
+
+dates <- seq(
+  from = as.Date("2001-01-01"),
+  to   = as.Date("2015-12-01"),
+  by   = "month"
+)
+
+stopifnot(length(dates) == nrow(all1_3_cum))
+all1_3_cum[, date := dates]
+setcolorder(all1_3_cum, c("date", "RW", "RSM", "AR"))
+
+# wide -> long
+all1_3_cum_long <- melt(
+  all1_3_cum,
+  id.vars = "date",
+  variable.name = "model",
+  value.name = "cum_abs_error"
+)
+
+# plot
+ggplot(all1_3_cum_long, aes(x = date, y = cum_abs_error, colour = model)) +
+  geom_line(size = 0.8) +
+  theme_light() +
+  scale_x_date(date_breaks = "3 year", date_labels = "%Y") +
+  labs(
+    y = "Cumulative absolute error",
+    colour = "Model"
+  )
+
+cum_err_p1_h3 <- ggplot(all1_3_cum_long, 
+                        aes(x = date, y = cum_abs_error, colour = model)) +
+  geom_line(size = 0.9) +
+  theme_light() +
+  scale_x_date(date_breaks = "3 year", date_labels = "%Y") +
+  labs(
+    title = "Cumulative Absolute Errors (2001–2015, horizon = 3)",
+    x = "",
+    y = "Cumulative absolute error",
+    colour = "Model"
+  ) +
+  theme(
+    plot.title  = element_text(size = 18, face = "bold", hjust = 0.5),
+    axis.title.x = element_text(size = 16),
+    axis.title.y = element_text(size = 16),
+    axis.text.x  = element_text(size = 14, angle = 0, hjust = 0.5),
+    axis.text.y  = element_text(size = 12),
+    legend.text  = element_text(size = 12),
+    legend.title = element_text(size = 13)
+  )
+cum_err_p1_h3
+
+ggsave(
+  filename = "03_Output/Charts/cum_err_p1_h3.png",
+  plot     = cum_err_p1_h3,
+  width    = 12,
+  height   = 6,
+  dpi      = 300
+)
+
 
 
 
