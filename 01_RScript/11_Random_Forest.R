@@ -61,27 +61,32 @@ best_mtry
 
 saveRDS(results_mtry, file = "03_Output/rfres_mtry.rds")
 
+#results_mtry <- readRDS("03_Output/rfres_mtry.rds")
+
+# plot
 plot_mtry <- ggplot(results_mtry, aes(x = mtry, y = rmse)) +
-      geom_line() +
-      geom_point(size = 2) +
-      geom_vline(xintercept = best_mtry, linetype = "dashed", color = "red") +
-      scale_x_continuous(breaks = results_mtry$mtry) +
-      theme_light() +
-      theme(
-        axis.text.x = element_text(angle = 90, hjust = 1),
-        panel.grid.major.x = element_blank(),
-        panel.grid.minor.x = element_blank()
-      )
+  geom_line() +
+  geom_point(size = 2) +
+  geom_vline(xintercept = best_mtry, linetype = "dashed", color = "red") +
+  scale_x_continuous(breaks = results_mtry$mtry) +
+  theme_light() +
+  theme(
+    axis.text.x  = element_text(angle = 90, hjust = 1, size = 14),
+    axis.text.y  = element_text(size = 14),
+    axis.title.x = element_text(size = 16),
+    axis.title.y = element_text(size = 16),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.x = element_blank()
+  )
 
 ggsave(
-  filename = "03_Output/Graphs/plots_rf/mtry_tuning.png",
+  filename = "03_Output/Charts/rf/mtry_tuning.png",
   plot     = plot_mtry,
-  width    = 12,     
-  height   = 6,     
-  dpi      = 300      
+  width    = 12,
+  height   = 6,
+  dpi      = 300
 )
 
-#results_mtry <- readRDS("03_Output/rfres_mtry.rds")
 
 #### PREDICTIONS ####
 
