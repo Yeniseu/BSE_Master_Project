@@ -10,7 +10,7 @@ library(readr)
 # ============================================
 # 1. LOAD DATA
 # ============================================
-file <- "02_Input/2025-09-MD.csv"
+file <- "02_Input/2026-01-MD.csv"
 
 # define the fredmd function 
 fredmd <- function(file = "", date_start = NULL, date_end = NULL, transform = TRUE) {
